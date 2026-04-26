@@ -13,6 +13,8 @@ import {
   CheckCircle2, 
   Lock, 
   ArrowRight, 
+  ArrowLeft,
+  CreditCard,
   Mail, 
   Phone, 
   ChevronRight,
@@ -24,7 +26,8 @@ import {
   Check,
   Ticket,
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  Plus
 } from 'lucide-react';
 import { 
   VOUCHERS, 
@@ -32,34 +35,89 @@ import {
   Voucher, 
   VerificationStep, 
   UserStatus,
-  NEWS_ITEMS,
-  NewsItem
+  News,
+  NEWS
 } from './constants';
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<VoucherCategory>('All');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationStep, setVerificationStep] = useState<VerificationStep>('CONTACT');
+  const [verificationStep, setVerificationStep] = useState<VerificationStep>('START');
   const [status, setStatus] = useState<UserStatus>('UNKNOWN');
-  const [contact, setContact] = useState('');
+  const [selectedNews, setSelectedNews] = useState<News | null>(null);
+  const [view, setView] = useState<'LANDING' | 'NEWS_DETAIL'>('LANDING');
+  
+  // Form fields
+  const [cccd, setCccd] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [consentApproved, setConsentApproved] = useState(false);
+  
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [systemChecks, setSystemChecks] = useState({
+    homefood: 'pending',
+    did: 'pending',
+    daccount: 'pending'
+  });
 
   const filteredVouchers = useMemo(() => {
     if (activeCategory === 'All') return VOUCHERS;
     return VOUCHERS.filter(v => v.category === activeCategory);
   }, [activeCategory]);
 
+  const [isNewUserPath, setIsNewUserPath] = useState(false);
+
   const handleStartVerification = () => {
     setIsVerifying(true);
-    setVerificationStep('CONTACT');
+    setVerificationStep('START');
+    setIsNewUserPath(false);
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleCccdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (contact) {
+    if (cccd.length >= 6) {
+      setIsNewUserPath(false);
+      setVerificationStep('IDENTIFYING');
+      
+      // Simulate database lookup
+      await new Promise(r => setTimeout(r, 1500));
+      
+      // Logic simulation based on last digit:
+      const lastDigit = cccd.slice(-1);
+      
+      if (lastDigit === '9' || lastDigit === '0') {
+        // Not a shareholder
+        setStatus('GUEST');
+        setVerificationStep('RESULT');
+      } else if (parseInt(lastDigit) >= 1 && parseInt(lastDigit) <= 8) {
+        // Shareholder flow (1-8): Consent -> OTP
+        setIsNewUserPath(lastDigit !== '8'); // 8 is existing user, 1-7 is new
+        if (!name) setName('NGUYỄN VĂN A');
+        setVerificationStep('CONSENT');
+      } else {
+        // Default guest
+        setStatus('GUEST');
+        setVerificationStep('RESULT');
+      }
+    }
+  };
+
+  const handleNewUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name && phone && email) {
+      setIsNewUserPath(true);
+      setVerificationStep('IDENTIFYING');
+      await new Promise(r => setTimeout(r, 1500));
+      setVerificationStep('CONSENT');
+    }
+  };
+
+  const handleConsentSubmit = () => {
+    if (consentApproved) {
       setVerificationStep('OTP');
     }
   };
@@ -76,15 +134,35 @@ export default function App() {
     }
   };
 
-  const handleVerifyOtp = () => {
-    if (contact.toLowerCase().includes('guest')) {
-      setStatus('GUEST');
-    } else if (contact.toLowerCase().includes('noaccount')) {
+  const handleVerifyOtp = async () => {
+    if (!isNewUserPath) {
+      // Existing user (Case 8): Go directly to landing page
+      setStatus('SHAREHOLDER_ACTIVE');
+      setIsVerifying(false);
+      return;
+    }
+
+    setVerificationStep('PROCESSING_SYSTEMS');
+    
+    // Simulate Step 20, 21, 22 from diagram
+    await new Promise(r => setTimeout(r, 800));
+    setSystemChecks(prev => ({ ...prev, homefood: 'success' }));
+    
+    await new Promise(r => setTimeout(r, 800));
+    setSystemChecks(prev => ({ ...prev, did: 'success' }));
+    
+    await new Promise(r => setTimeout(r, 800));
+    setSystemChecks(prev => ({ ...prev, daccount: 'success' }));
+    
+    await new Promise(r => setTimeout(r, 500));
+    
+    // Set final status
+    if (isNewUserPath || cccd === '123456789') {
       setStatus('SHAREHOLDER_NO_ACCOUNT');
     } else {
       setStatus('SHAREHOLDER_ACTIVE');
     }
-    setVerificationStep('RESULT');
+    setIsVerifying(false);
   };
 
   const handleClaimVoucher = (voucher: Voucher) => {
@@ -104,11 +182,105 @@ export default function App() {
 
   const resetFlow = () => {
     setIsVerifying(false);
-    setVerificationStep('CONTACT');
+    setVerificationStep('START');
     setStatus('UNKNOWN');
-    setContact('');
+    setCccd('');
+    setName('');
+    setPhone('');
+    setEmail('');
     setOtp(['', '', '', '', '', '']);
+    setConsentApproved(false);
+    setSystemChecks({ homefood: 'pending', did: 'pending', daccount: 'pending' });
   };
+
+  if (view === 'NEWS_DETAIL' && selectedNews) {
+    return (
+      <div className="min-h-screen bg-white font-sans text-[#1D1D1F]">
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('LANDING')}>
+              <div className="w-10 h-10 bg-[#F27D26] rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-orange-500/20">V</div>
+              <span className="font-black text-xl tracking-tight hidden sm:block">VNDIRECT</span>
+            </div>
+            <button 
+              onClick={() => setView('LANDING')}
+              className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#1D1D1F] transition-colors"
+            >
+              <ArrowLeft size={18} /> Quay lại trang chủ
+            </button>
+          </div>
+        </nav>
+
+        <main className="pt-32 pb-20 px-4">
+          <article className="max-w-3xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <span className="px-3 py-1 bg-orange-50 text-[#F27D26] text-[10px] font-black uppercase tracking-widest rounded-full">Tin tức ĐHCĐ</span>
+                <span className="text-sm text-gray-400 font-medium">{selectedNews.date}</span>
+              </div>
+              
+              <h1 className="text-4xl sm:text-5xl font-[900] leading-[1.1] mb-8 tracking-tight">
+                {selectedNews.title}
+              </h1>
+              
+              <div className="aspect-[21/9] rounded-3xl overflow-hidden mb-12 shadow-2xl">
+                <img src={selectedNews.image} alt={selectedNews.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+
+              <div className="prose prose-lg max-w-none">
+                <p className="text-xl text-gray-600 font-medium leading-relaxed mb-8 italic border-l-4 border-[#F27D26] pl-6 py-2 bg-gray-50 rounded-r-2xl">
+                  {selectedNews.excerpt}
+                </p>
+                <div className="text-lg text-gray-800 leading-relaxed space-y-6">
+                  {selectedNews.content.split('\n').map((paragraph, idx) => (
+                    <p key={idx}>{paragraph}</p>
+                  ))}
+                  <p>Trong năm 2024, VNDIRECT kiến tạo các chương trình đặc quyền cổ đông với mong muốn tạo nên một cộng đồng cùng đồng hành và chia sẻ những giá trị thịnh vượng. Thông qua hạ tầng đa dịch vụ được tích hợp trên nền tảng số, VNDIRECT hy vọng sẽ tối ưu được sự tiện lợi và trải nghiệm cho khách hàng cũng như các nhà đầu tư.</p>
+                </div>
+              </div>
+
+              <div className="mt-16 pt-8 border-t border-gray-100 flex items-center justify-between">
+                <div className="flex gap-4">
+                  <button className="p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <Mail size={20} className="text-gray-500" />
+                  </button>
+                  <button className="p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <Copy size={20} className="text-gray-500" />
+                  </button>
+                </div>
+                <button 
+                  onClick={() => {
+                    setView('LANDING');
+                    handleStartVerification();
+                  }}
+                  className="bg-[#1D1D1F] text-white px-8 py-3 rounded-2xl font-bold text-sm uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  Xác thực ngay để nhận ưu đãi
+                </button>
+              </div>
+            </motion.div>
+          </article>
+        </main>
+
+        <footer className="bg-gray-50 border-t border-gray-100 py-12 px-4">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-[#F27D26] rounded-lg flex items-center justify-center text-white font-black text-sm">V</div>
+              <span className="font-bold text-sm text-gray-500">© 2024 VNDIRECT. All rights reserved.</span>
+            </div>
+            <div className="flex gap-8 text-sm font-bold text-gray-400">
+              <span className="hover:text-gray-600 cursor-pointer transition-colors">Về chúng tôi</span>
+              <span className="hover:text-gray-600 cursor-pointer transition-colors">Điều khoản & Bảo mật</span>
+              <span className="hover:text-gray-600 cursor-pointer transition-colors">Liên hệ</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] text-[#1D1D1F] font-sans selection:bg-[#F27D26]/10 selection:text-[#F27D26] scroll-smooth">
@@ -155,7 +327,7 @@ export default function App() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cổ đông</span>
-                  <span className="text-sm font-bold leading-none">{contact}</span>
+                  <span className="text-sm font-bold leading-none">{name || cccd}</span>
                 </div>
                 <button onClick={resetFlow} className="ml-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
                   <X size={16} />
@@ -192,16 +364,16 @@ export default function App() {
               
               <div className="flex flex-wrap gap-4">
                 <button 
-                  onClick={handleStartVerification}
+                  onClick={(status === 'SHAREHOLDER_ACTIVE' || status === 'SHAREHOLDER_NO_ACCOUNT') ? () => document.getElementById('vouchers')?.scrollIntoView({ behavior: 'smooth' }) : handleStartVerification}
                   className="px-8 py-4 bg-[#F27D26] text-white rounded-2xl font-bold hover:bg-[#D96C1F] hover:shadow-2xl hover:shadow-[#F27D26]/30 transition-all flex items-center gap-3 active:scale-[0.98]"
                 >
-                  Bắt đầu xác thực <ArrowRight size={20} />
+                  {(status === 'SHAREHOLDER_ACTIVE' || status === 'SHAREHOLDER_NO_ACCOUNT') ? 'Sử dụng voucher' : 'Xác thực ngay'} <ArrowRight size={20} />
                 </button>
                 <div className="flex items-center gap-4 px-6 border-l border-gray-200">
                   <div className="flex -space-x-3">
                     {[1, 2, 3].map(i => (
                       <div key={i} className={`w-10 h-10 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden`}>
-                        <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
+                        <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" referrerPolicy="no-referrer" />
                       </div>
                     ))}
                   </div>
@@ -237,7 +409,7 @@ export default function App() {
               </div>
               <div className="flex-1 text-center md:text-left">
                 <h3 className="font-bold text-red-900 text-xl mb-2">Thông báo từ hệ thống</h3>
-                <p className="text-red-700/80 font-medium">Rất tiếc, thông tin <strong className="text-red-700">{contact}</strong> không nằm trong danh sách cổ đông chốt ngày 31/03/2024. Quý khách vui lòng kiểm tra lại hoặc liên hệ tổng đài hỗ trợ.</p>
+                <p className="text-red-700/80 font-medium">Rất tiếc, thông tin <strong className="text-red-700">{cccd || phone}</strong> không nằm trong danh sách cổ đông chốt ngày 31/03/2024. Quý khách vui lòng kiểm tra lại hoặc liên hệ tổng đài hỗ trợ.</p>
               </div>
               <button className="px-8 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-colors">Liên hệ hỗ trợ</button>
             </motion.div>
@@ -298,23 +470,55 @@ export default function App() {
       </main>
 
       {/* News Section */}
-      <section id="news" className="bg-gray-50/50 py-24 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+      <section id="news" className="py-24 px-4 bg-gray-50/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-end mb-12">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
-                Thông tin cập nhật
-              </div>
-              <h2 className="text-4xl font-black tracking-tight">Trang Tin Tức <br /><span className="text-[#F27D26]">VNDIRECT & Cổ Đông</span></h2>
+              <span className="text-[10px] font-black text-[#F27D26] uppercase tracking-[0.3em] mb-3 block">Tin tức ĐHCĐ</span>
+              <h2 className="text-4xl font-[900] tracking-tight">Hành trình Cổ đông</h2>
             </div>
-            <button className="text-sm font-bold text-gray-400 hover:text-[#F27D26] flex items-center gap-2 group transition-colors">
-              Xem tất cả tin tức <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {NEWS_ITEMS.map((item, idx) => (
-              <NewsCard key={item.id} item={item} index={idx} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {NEWS.map((item) => (
+              <motion.div
+                key={item.id}
+                whileHover={{ y: -8 }}
+                onClick={() => {
+                  setSelectedNews(item);
+                  setView('NEWS_DETAIL');
+                  window.scrollTo(0, 0);
+                }}
+                className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] cursor-pointer group"
+              >
+                <div className="aspect-[16/10] overflow-hidden relative">
+                  <img 
+                    src={item.image} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <span className="px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest text-[#F27D26]">
+                      VNDNews
+                    </span>
+                  </div>
+                </div>
+                <div className="p-8">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                    {item.date}
+                  </div>
+                  <h3 className="text-xl font-black mb-4 leading-[1.3] group-hover:text-[#F27D26] transition-colors line-clamp-2">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm text-gray-500 font-medium line-clamp-3 leading-relaxed">
+                    {item.excerpt}
+                  </p>
+                  <div className="mt-6 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#1D1D1F]">
+                    Đọc thêm <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -389,56 +593,226 @@ export default function App() {
                   <X size={24} />
                 </button>
 
-                {verificationStep === 'CONTACT' && (
+                {verificationStep === 'START' && (
                   <div className="text-center">
                     <div className="w-20 h-20 bg-amber-50 text-[#F27D26] rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner shadow-amber-200/50">
-                      <ShieldCheck size={40} />
+                      <User size={40} />
                     </div>
-                    <h3 className="text-3xl font-[900] mb-4 tracking-tight">Xác thực danh tính</h3>
+                    <h3 className="text-3xl font-[900] mb-4 tracking-tight">Xác thực cổ đông</h3>
                     <p className="text-gray-500 mb-10 text-sm font-medium leading-relaxed">
-                      Quý cổ đông vui lòng nhập thông tin liên lạc để nhận mã xác thực ưu đãi.
+                      Vui lòng chọn trạng thái hiện tại của Quý khách tại VNDIRECT.
                     </p>
                     
-                    <form onSubmit={handleContactSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <button 
+                        onClick={() => setVerificationStep('EXISTING_USER')}
+                        className="w-full bg-[#1D1D1F] text-white p-6 rounded-3xl font-black text-left flex items-center justify-between group hover:bg-gray-800 transition-all border-2 border-transparent hover:border-[#F27D26]/30"
+                      >
+                        <div>
+                          <span className="block text-xl">Đã có tài khoản</span>
+                          <span className="text-xs text-gray-400 font-bold uppercase tracking-widest group-hover:text-amber-500 transition-colors">Xác thực qua CCCD</span>
+                        </div>
+                        <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
+                      </button>
+                      
+                      <button 
+                        onClick={() => setVerificationStep('NEW_USER')}
+                        className="w-full bg-gray-50 text-[#1D1D1F] p-6 rounded-3xl font-black text-left flex items-center justify-between group hover:bg-gray-100 transition-all border-2 border-gray-100 hover:border-gray-200"
+                      >
+                        <div>
+                          <span className="block text-xl">Chưa có tài khoản</span>
+                          <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Đăng ký thông tin mới</span>
+                        </div>
+                        <Plus size={24} className="group-hover:rotate-90 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {verificationStep === 'EXISTING_USER' && (
+                  <div>
+                    <div className="flex items-center gap-4 mb-8">
+                       <button onClick={() => setVerificationStep('START')} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><ArrowLeft size={20}/></button>
+                       <h3 className="text-2xl font-black">Nhập số CCCD</h3>
+                    </div>
+                    <form onSubmit={handleCccdSubmit} className="space-y-6">
                       <div className="relative group">
                         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#F27D26] transition-colors">
-                          <Mail size={22} />
+                          <CreditCard size={22} />
                         </div>
                         <input 
                           type="text" 
-                          placeholder="Email hoặc Số điện thoại"
-                          value={contact}
-                          onChange={(e) => setContact(e.target.value)}
+                          placeholder="Số thẻ CCCD/CMND"
+                          value={cccd}
+                          onChange={(e) => setCccd(e.target.value)}
                           className="w-full bg-gray-50 border-2 border-gray-100 rounded-3xl py-5 pl-14 pr-6 text-base font-bold focus:outline-none focus:ring-4 focus:ring-[#F27D26]/10 focus:border-[#F27D26] transition-all placeholder:text-gray-300"
                           required
                         />
                       </div>
                       <button 
                         type="submit"
-                        className="w-full bg-[#1D1D1F] text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-gray-300 hover:bg-gray-800 transition-all flex items-center justify-center gap-3 group active:scale-[0.98]"
+                        disabled={cccd.length < 6}
+                        className={`w-full py-5 rounded-3xl font-black text-sm uppercase tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-3 group ${
+                          cccd.length >= 6 
+                          ? 'bg-[#1D1D1F] text-white hover:bg-gray-800 shadow-2xl shadow-gray-200' 
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                        }`}
                       >
-                        Gửi mã xác thực
+                        Tiếp tục xác thực
+                        <ArrowRight size={20} className={`${cccd.length >= 6 ? 'group-hover:translate-x-1' : ''} transition-transform`} />
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {verificationStep === 'NEW_USER' && (
+                  <div>
+                    <div className="flex items-center gap-4 mb-8">
+                       <button onClick={() => setVerificationStep('START')} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><ArrowLeft size={20}/></button>
+                       <h3 className="text-2xl font-black">Thông tin đăng ký</h3>
+                    </div>
+                    <form onSubmit={handleNewUserSubmit} className="space-y-4">
+                      <input 
+                        type="text" 
+                        placeholder="Họ và tên"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-4 px-6 text-sm font-bold focus:outline-none focus:border-[#F27D26] transition-all"
+                        required
+                      />
+                      <input 
+                        type="tel" 
+                        placeholder="Số điện thoại"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-4 px-6 text-sm font-bold focus:outline-none focus:border-[#F27D26] transition-all"
+                        required
+                      />
+                      <input 
+                        type="email" 
+                        placeholder="Địa chỉ Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-4 px-6 text-sm font-bold focus:outline-none focus:border-[#F27D26] transition-all"
+                        required
+                      />
+                      <button 
+                        type="submit"
+                        className="w-full bg-[#1D1D1F] text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-gray-200 hover:bg-gray-800 transition-all flex items-center justify-center gap-3 group active:scale-[0.98] mt-4"
+                      >
+                        Xác nhận thông tin
                         <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                       </button>
                     </form>
-                    <div className="mt-10 p-5 bg-gray-50 rounded-2xl flex items-start gap-4 text-left">
-                      <AlertCircle className="text-amber-500 flex-shrink-0" size={18} />
-                      <p className="text-[11px] text-gray-400 font-bold leading-relaxed uppercase">
-                        Thông tin của bạn được bảo mật tuyệt đối theo tiêu chuẩn chứng khoán VNDIRECT.
-                      </p>
+                  </div>
+                )}
+
+                {verificationStep === 'IDENTIFYING' && (
+                  <div className="text-center py-12">
+                    <div className="relative w-24 h-24 mx-auto mb-10">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                        className="absolute inset-0 border-4 border-[#F27D26]/10 border-t-[#F27D26] rounded-full"
+                      />
+                      <div className="absolute inset-4 bg-amber-50 rounded-full flex items-center justify-center text-[#F27D26]">
+                        <Search size={32} />
+                      </div>
                     </div>
+                    <h3 className="text-3xl font-[900] mb-4 tracking-tight">Tìm kiếm thông tin</h3>
+                    <p className="text-gray-500 text-sm font-medium leading-relaxed max-w-[300px] mx-auto">
+                      VNDIRECT đang đối soát dữ liệu với danh sách cổ đông được chốt ngày 31/03/2024...
+                    </p>
+                  </div>
+                )}
+
+                {verificationStep === 'WELCOME_BACK' && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-green-50 text-green-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner shadow-green-100">
+                      <CreditCard size={40} />
+                    </div>
+                    <h3 className="text-3xl font-[900] mb-12 tracking-tight">Chào mừng trở lại!</h3>
+                    
+                    <button 
+                      onClick={() => {
+                        setStatus('SHAREHOLDER_ACTIVE');
+                        setIsVerifying(false);
+                      }}
+                      className="w-full bg-[#1D1D1F] text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98] shadow-2xl shadow-gray-200 flex items-center justify-center gap-2 group"
+                    >
+                      Tiếp tục trải nghiệm <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    
+                    <button 
+                      onClick={() => setVerificationStep('START')}
+                      className="mt-6 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      Không phải tôi? Nhập lại CCCD
+                    </button>
+                  </div>
+                )}
+
+                {verificationStep === 'CONSENT' && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-green-50 text-green-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle2 size={40} />
+                    </div>
+                    <h3 className="text-2xl font-[900] mb-2 tracking-tight">Tìm thấy thông tin!</h3>
+                    <div className="bg-gray-50 rounded-2xl p-4 mb-8 inline-block border border-gray-100">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Cổ đông xác định</span>
+                      <span className="text-lg font-black text-[#1D1D1F]">{name || cccd}</span>
+                    </div>
+                    
+                    <p className="text-gray-500 mb-8 text-sm font-medium leading-relaxed">
+                      Để tiếp tục nhận ưu đãi, vui lòng đồng ý cho phép VNDIRECT truy xuất thông tin của Quý khách từ hệ thống.
+                    </p>
+                    
+                    <div className="mb-10 text-left bg-gray-50 p-6 rounded-[32px] border border-gray-100">
+                      <label className="flex items-start gap-4 cursor-pointer group">
+                        <div className="relative mt-1">
+                          <input 
+                            type="checkbox" 
+                            checked={consentApproved}
+                            onChange={(e) => setConsentApproved(e.target.checked)}
+                            className="peer sr-only"
+                          />
+                          <div className="w-5 h-5 border-2 border-gray-200 rounded-md peer-checked:bg-[#F27D26] peer-checked:border-[#F27D26] transition-all" />
+                          <Check size={14} className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                        </div>
+                        <span className="text-sm font-bold text-gray-600 group-hover:text-gray-900 transition-colors">
+                          Tôi xác nhận thông tin trên là chính xác và đồng ý với điều khoản chia sẻ thông tin cổ đông.
+                        </span>
+                      </label>
+                    </div>
+
+                    <button 
+                      onClick={handleConsentSubmit}
+                      disabled={!consentApproved}
+                      className={`w-full py-5 rounded-3xl font-black text-sm uppercase tracking-widest transition-all active:scale-[0.98] ${
+                        consentApproved 
+                        ? 'bg-[#1D1D1F] text-white shadow-xl hover:bg-gray-800' 
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      Xác nhận & Nhận mã OTP
+                    </button>
                   </div>
                 )}
 
                 {verificationStep === 'OTP' && (
                   <div className="text-center">
-                    <div className="w-20 h-20 bg-amber-50 text-[#F27D26] rounded-3xl flex items-center justify-center mx-auto mb-8">
+                    <button 
+                      onClick={() => setVerificationStep('CONSENT')}
+                      className="absolute top-8 left-8 p-3 text-gray-400 hover:bg-gray-100 rounded-full transition-colors active:scale-90"
+                    >
+                      <ArrowLeft size={24} />
+                    </button>
+                    <div className="w-20 h-20 bg-amber-50 text-[#F27D26] rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner shadow-amber-200/50">
                       <Lock size={40} />
                     </div>
                     <h3 className="text-3xl font-[900] mb-4 tracking-tight">Xác nhận mã OTP</h3>
                     <p className="text-gray-500 mb-10 text-sm font-medium">
-                      Mã gồm 6 chữ số đã được gửi đến <br />
-                      <strong className="text-[#1D1D1F] text-base">{contact}</strong>
+                      Mã xác thực đã được gửi đến thiết bị của Quý khách.
                     </p>
                     
                     <div className="flex justify-between gap-2 mb-10">
@@ -457,24 +831,61 @@ export default function App() {
 
                     <button 
                       onClick={handleVerifyOtp}
-                      className="w-full bg-[#1D1D1F] text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
+                      className="w-full bg-[#1D1D1F] text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98] shadow-2xl shadow-gray-200"
                     >
                       Hoàn tất xác thực
                     </button>
                     
-                    <div className="mt-10 flex flex-col gap-6">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-sm font-bold text-gray-400">Không nhận được mã?</span>
-                        <button className="text-sm font-black text-[#F27D26] hover:underline">
-                          Gửi lại mã (0:59)
-                        </button>
-                      </div>
-                      <button 
-                        onClick={() => setVerificationStep('CONTACT')}
-                        className="text-xs font-bold text-gray-300 hover:text-gray-600 transition-colors uppercase tracking-widest"
-                      >
-                        Sử dụng thông tin khác
+                    <div className="mt-10">
+                      <button className="text-sm font-black text-[#F27D26] hover:underline">
+                        Gửi lại mã (0:59)
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {verificationStep === 'PROCESSING_SYSTEMS' && (
+                  <div className="text-center py-10">
+                    <div className="relative w-28 h-28 mx-auto mb-10">
+                       <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                        className="absolute inset-0 border-4 border-[#F27D26]/10 border-t-[#F27D26] rounded-full"
+                       />
+                       <motion.div 
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ repeat: Infinity, duration: 2 }}
+                        className="absolute inset-4 bg-amber-50 rounded-full flex items-center justify-center text-[#F27D26]"
+                       >
+                         <Ticket size={32} />
+                       </motion.div>
+                    </div>
+                    <h3 className="text-3xl font-[900] mb-8 tracking-tight">Thiết lập đặc quyền</h3>
+                    
+                    <div className="space-y-4 text-left max-w-[320px] mx-auto">
+                      {[
+                        { label: 'Bước 20: Xác thực Homefood', key: 'homefood' },
+                        { label: 'Bước 21: Cấp mã định danh DID', key: 'did' },
+                        { label: 'Bước 22: Đồng bộ DAccount', key: 'daccount' }
+                      ].map((sys, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black w-5 h-5 rounded-full bg-white flex items-center justify-center border border-gray-200">{idx+20}</span>
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-tighter">{sys.label}</span>
+                          </div>
+                          {(systemChecks as any)[sys.key] === 'success' ? (
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-200"
+                            >
+                              <Check size={14} />
+                            </motion.div>
+                          ) : (
+                            <div className="w-5 h-5 border-2 border-gray-200 border-t-[#F27D26] rounded-full animate-spin" />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -497,10 +908,10 @@ export default function App() {
                     </h3>
                     <p className="text-gray-500 mb-12 text-sm font-medium leading-relaxed px-4">
                       {status === 'GUEST' 
-                        ? 'Dữ liệu không khớp với danh sách cổ đông VNDIRECT. Vui lòng liên hệ 1900 54 54 09 để cập nhật thông tin.' 
+                        ? 'Số CCCD không khớp trong dữ liệu cổ đông VNDIRECT. Vui lòng liên hệ 1900 54 54 09 để cập nhật.' 
                         : status === 'SHAREHOLDER_NO_ACCOUNT'
-                          ? 'Chúng tôi đã tìm thấy tên bạn trong danh sách cổ đông. Tuy nhiên, voucher chỉ kích hoạt khi bạn có tài khoản D-BOARD.'
-                          : 'Xác thực tài khoản thành công. Quý cổ đông hiện có thể nhận toàn bộ ưu đãi từ hệ sinh thái của chúng tôi.'}
+                          ? 'Mã chứng khoán của bạn đã được xác định. Hãy mở tài khoản DAccount để kích hoạt voucher.'
+                          : 'Xác thực tài khoản thành công. Quý cổ đông hiện có thể nhận toàn bộ ưu đãi từ hệ sinh thái.'}
                     </p>
 
                     <button 
@@ -535,7 +946,7 @@ export default function App() {
               className="bg-white rounded-[48px] w-full max-w-[560px] overflow-hidden shadow-2xl relative z-10"
             >
               <div className="relative h-48 sm:h-64 overflow-hidden">
-                <img src={selectedVoucher.image} alt={selectedVoucher.title} className="w-full h-full object-cover" />
+                <img src={selectedVoucher.image} alt={selectedVoucher.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                 <div className="absolute bottom-8 left-10 right-10">
                   <div className="flex items-center gap-3 mb-2">
@@ -616,41 +1027,8 @@ export default function App() {
   );
 }
 
-function NewsCard({ item, index }: { item: NewsItem, index: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="group cursor-pointer"
-    >
-      <div className="relative h-48 rounded-3xl overflow-hidden mb-6 shadow-sm group-hover:shadow-xl transition-all duration-500">
-        <img 
-          src={item.image} 
-          alt={item.title} 
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-        />
-        <div className="absolute top-4 left-4">
-          <span className="px-3 py-1 bg-white/90 backdrop-blur-md rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm">
-            {item.category}
-          </span>
-        </div>
-      </div>
-      <div className="px-2">
-        <span className="text-[10px] font-bold text-[#F27D26] uppercase tracking-widest mb-2 block">{item.date}</span>
-        <h3 className="font-bold text-base leading-snug mb-3 group-hover:text-[#F27D26] transition-colors line-clamp-2">
-          {item.title}
-        </h3>
-        <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 font-medium">
-          {item.summary}
-        </p>
-      </div>
-    </motion.div>
-  );
-}
-
 interface VoucherCardProps {
+  key?: React.Key;
   voucher: Voucher;
   isLocked: boolean;
   userStatus: UserStatus;
@@ -671,6 +1049,7 @@ function VoucherCard({ voucher, isLocked, userStatus, index, onClaim }: VoucherC
           src={voucher.image} 
           alt={voucher.title} 
           className={`w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 ${isLocked ? 'grayscale opacity-60 scale-105' : ''}`}
+          referrerPolicy="no-referrer"
         />
         <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] text-[#1D1D1F] border border-white/20 shadow-sm">
           {voucher.category}
@@ -681,12 +1060,29 @@ function VoucherCard({ voucher, isLocked, userStatus, index, onClaim }: VoucherC
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
-              className="absolute inset-0 bg-[#1D1D1F]/50 backdrop-blur-[4px] flex flex-col items-center justify-center p-8 text-center"
+              className="absolute inset-0 bg-[#1D1D1F]/50 backdrop-blur-[4px] flex flex-col items-center justify-center p-8 text-center z-20 group"
             >
-              <div className="w-16 h-16 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full flex items-center justify-center text-white mb-4 shadow-2xl">
+              <motion.div 
+                initial={{ scale: 0.8, y: 10 }}
+                animate={{ scale: 1, y: 0 }}
+                className="w-16 h-16 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full flex items-center justify-center text-white mb-6 shadow-2xl group-hover:scale-110 transition-transform"
+              >
                 <Lock size={28} />
-              </div>
-              <span className="text-white text-xs font-black uppercase tracking-[0.2em] leading-relaxed">Xác thực cổ đông <br /> để mở khóa</span>
+              </motion.div>
+              <span className="text-white text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed mb-6 block drop-shadow-md">
+                {userStatus === 'SHAREHOLDER_NO_ACCOUNT' ? 'Mở tài khoản để nhận voucher' : 'Xác thực cổ đông để nhận'}
+              </span>
+              {userStatus === 'SHAREHOLDER_NO_ACCOUNT' && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open('https://id.vndirect.com.vn/dang-ky', '_blank');
+                  }}
+                  className="bg-[#F27D26] text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-orange-500/20 active:scale-95 transition-all"
+                >
+                  Mở tài khoản ngay
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
